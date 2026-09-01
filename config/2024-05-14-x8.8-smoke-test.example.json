@@ -1,0 +1,46 @@
+{
+  "event_id": "2024-05-14-x8.8-smoke-test",
+  "input_ms": "/absolute/path/to/IDB20240514_163948-165948.cal.ms",
+  "timerange": "2024/05/14/16:47:12~2024/05/14/16:47:20",
+  "xycen_arcsec": [
+    902.0,
+    -293.0
+  ],
+  "phasecenter": "J2000 0.8975568718764093rad 0.3247543505252678rad",
+  "fov_arcsec": [
+    256.0,
+    256.0
+  ],
+  "cell_arcsec": 1.0,
+  "imsize": 512,
+  "correlation": "XX",
+  "antenna": "0~6,8,10~12",
+  "antenna_by_spw": {
+    "23~49": "0~5,8,10~12"
+  },
+  "refant": "0",
+  "selfcal_spws": [
+    18
+  ],
+  "qa_spws": [
+    18
+  ],
+  "mask_spw_groups": [
+    "13~20"
+  ],
+  "spw_min": 1,
+  "spw_max": 49,
+  "neighbor_half_width": 2,
+  "uvrange": ">500lambda",
+  "robust": 1.0,
+  "gain": 0.05,
+  "initial_image_niter": 50,
+  "qa_image_niter": 50,
+  "sbeam_1ghz_arcsec": 80.0,
+  "max_rounds": 1,
+  "notes": [
+    "Engineering smoke test only: one mask group, one representative 7.742 GHz SPW, one round.",
+    "Uses the same 512 pixels at 1 arcsec/pixel mask field as the full science configuration.",
+    "Do not use this reduced product as the final science result."
+  ]
+}

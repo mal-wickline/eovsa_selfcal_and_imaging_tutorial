@@ -1,0 +1,12 @@
+.venv/
+.venv-*/
+runs/
+preflight/
+*.log
+.DS_Store
+__pycache__/
+.runtime/
+*.ms/
+*.G/
+*.fits
+*.npz
