@@ -22,6 +22,7 @@ Repository guides:
 - [Generated product tree](docs/PRODUCTS.md)
 - [CARTA and macOS figure viewing](docs/VIEWING.md)
 - [Selected example gallery](examples/2024-05-14-x8.8/README.md)
+- [Updated-calibration rerun](docs/UPDATED_CALIBRATION_RERUN.md)
 - [Preliminary GitHub upload](docs/GITHUB_UPLOAD.md)
 
 ## What to download
@@ -257,6 +258,27 @@ Run this with the separate SunCASA environment, not the native `.venv`:
 CASAPY="/path/to/suncasa/python"
 "$CASAPY" scripts/tutorial_imaging.py config/my-event.json "$RUN_DIR"
 ```
+
+To also make the tutorial-style individual-band cube and color-coded EOVSA
+contours over AIA 171, add both flags:
+
+```bash
+"$CASAPY" scripts/tutorial_imaging.py config/my-event.json "$RUN_DIR" \
+  --tutorial-summary --multiband
+```
+
+`final_imaging_spws` controls that cube. It can contain nearly all 50 bands,
+but must be edited after inspecting the new MS. Bands outside `selfcal_spws`
+are pipeline-calibrated context; they are not silently promoted to
+self-calibrated data.
+
+## Repeating the event after an upstream calibration change
+
+Never replace the old input MS or gallery. Follow
+[`UPDATED_CALIBRATION_RERUN.md`](docs/UPDATED_CALIBRATION_RERUN.md), use the
+`updated-cal` example configuration, and publish the approved new PNGs beside
+the previous-calibration gallery. This keeps upstream-calibration changes
+separate from self-calibration changes.
 
 To add AIA 171, GOES, disk/grid, flare zoom, and radio contours:
 

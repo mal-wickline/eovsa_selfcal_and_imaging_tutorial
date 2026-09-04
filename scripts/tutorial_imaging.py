@@ -188,6 +188,9 @@ def main() -> None:
         help="Comma-separated full-Sun/tutorial imaging frequency selections")
     parser.add_argument("--tutorial-summary", action="store_true",
                         help="Also download AIA 171 and save SunCASA summary figures")
+    parser.add_argument(
+        "--multiband", action="store_true",
+        help="Make tutorial-style, color-coded individual-SPW overlays on AIA 171")
     parser.add_argument("--reimage", action="store_true",
                         help="Regenerate FITS even when completed products already exist")
     args = parser.parse_args()
@@ -345,6 +348,56 @@ def main() -> None:
                         plt.close(plt.gcf())
                     finally:
                         os.chdir(starting_directory)
+
+            if args.multiband:
+                # This follows the EOVSA tutorial's multi-band recipe: a list
+                # of individual SPWs creates one frequency plane per SPW.  It
+                # is intentionally different from strings such as '10~14GHz',
+                # which combine a range into one MFS image.  Keep only SPWs
+                # explicitly approved after the updated-calibration survey.
+                multiband_spws = [
+                    int(value) for value in cfg.get(
+                        "final_imaging_spws", cfg["selfcal_spws"])
+                ]
+                if not multiband_spws:
+                    raise RuntimeError("final_imaging_spws is empty")
+                spw_list = [str(value) for value in multiband_spws]
+                # One antenna selection must be valid for the whole cube.  Use
+                # the conservative high-SPW override when the list crosses it.
+                multiband_antenna = cfg["antenna"]
+                if max(multiband_spws) >= 23:
+                    multiband_antenna = cfg.get("antenna_by_spw", {}).get(
+                        "23~49", multiband_antenna)
+                for label, vis in (("before", before_ms), ("after", after_ms)):
+                    cube = out / f"multiband_{label}.image.fits"
+                    summary = out / f"multiband_aia171_{label}.png"
+                    scratch_cube = scratch / cube.name
+                    starting_directory = os.getcwd()
+                    try:
+                        ql.qlookplot(
+                            vis=str(vis), specfile=str(specfiles[label]),
+                            timerange=timerange, spw=spw_list, stokes=stokes,
+                            antenna=multiband_antenna, uvrange=cfg["uvrange"],
+                            workdir=str(scratch), outfits=str(scratch_cube),
+                            overwrite=True, quiet=False, plotaia=True,
+                            aiawave=171, aiafits=str(aia_file),
+                            xycen=cfg["xycen_arcsec"], fov=cfg["fov_arcsec"],
+                            imsize=[cfg["imsize"]],
+                            cell=[f'{cfg["cell_arcsec"]}arcsec'],
+                            usemsphacenter=False, restoringbeam=["6arcsec"],
+                            clevels=[0.5, 1.0], calpha=0.35,
+                        )
+                        if not scratch_cube.is_file():
+                            raise RuntimeError(
+                                f"SunCASA did not create multi-band cube: {scratch_cube}")
+                        shutil.copy2(scratch_cube, cube)
+                        plt.gcf().savefig(summary, dpi=180)
+                        plt.close(plt.gcf())
+                    finally:
+                        os.chdir(starting_directory)
+                (out / "multiband_spws.txt").write_text(
+                    "Individual SPWs used: " + ",".join(spw_list) + "\n"
+                    "Bands outside selfcal_spws are pipeline-calibrated context only.\n")
 
     for spw in representative_spws:
         render_pair(flare["before"][spw], flare["after"][spw],

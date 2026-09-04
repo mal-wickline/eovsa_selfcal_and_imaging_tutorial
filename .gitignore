@@ -10,3 +10,9 @@ __pycache__/
 *.G/
 *.fits
 *.npz
+
+# Local event configs contain absolute machine-specific MS paths. Commit the
+# sanitized *.example.json templates instead.
+config/2024-05-14-x8.8.json
+config/2024-05-14-x8.8-smoke-test.json
+config/2024-05-14-x8.8-updated-cal.json

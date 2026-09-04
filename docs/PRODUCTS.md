@@ -15,7 +15,8 @@ flowchart TD
     H --> I["dynamic_spectrum_*.png"]
     H --> J["before_after_flare_mfs_*.png"]
     H --> K["tutorial_summary_*_*.png"]
-    H --> L["FITS for CARTA; not committed"]
+    H --> L["multiband_*.image.fits: individual-SPW cube"]
+    H --> M["multiband_aia171_*.png: frequency-colored contours"]
 ```
 
 ## Product tree
@@ -42,6 +43,10 @@ runs/<event-and-timestamp>/
         ├── before_after_flare_mfs_*.png   # dirty-map QA, not final restored imaging
         ├── tutorial_summary_before_*.png
         ├── tutorial_summary_after_*.png
+        ├── multiband_aia171_before.png
+        ├── multiband_aia171_after.png
+        ├── multiband_spws.txt             # exact planes requested
+        ├── multiband_*.image.fits          # local-only frequency cubes
         └── *.fits / *.ms                  # local-only intermediates
 ```
 
@@ -58,6 +63,11 @@ runs/<event-and-timestamp>/
 - Tutorial summaries use AIA 171 FITS plus positive 60/75/90% radio contours.
   Earlier black-spectrum or disk-wide-contour summaries are failed development
   products and should not be presented.
+- The multi-band overlay follows the official SunCASA tutorial by passing a
+  list of individual SPWs. A GHz range such as `10~14GHz` is MFS and cannot
+  substitute for this frequency-resolved product.
+- `multiband_spws.txt` is the provenance record for the displayed colors.
+  SPWs outside `selfcal_spws` are upstream pipeline-calibrated context only.
 
 ## What to open and with which application
 
