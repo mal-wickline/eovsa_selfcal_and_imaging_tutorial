@@ -43,8 +43,17 @@ def main() -> None:
     imaging = run / "qa" / "tutorial_imaging"
     requested.extend([
         (imaging / "dynamic_spectrum_after.png", destination / "dynamic_spectrum_after.png"),
-        (imaging / "multiband_aia171_before.png", destination / "multiband_aia171_before.png"),
-        (imaging / "multiband_aia171_after.png", destination / "multiband_aia171_after.png"),
+        # qlookplot_* and multiband_aia171_* are intentional aliases of the
+        # same tutorial-style figure. Publish only the clearly named copy so
+        # the GitHub gallery does not contain duplicate megabyte-scale PNGs.
+        (imaging / "qlookplot_all_frequencies_aia171_before.png",
+         destination / "qlookplot_all_frequencies_aia171_before.png"),
+        (imaging / "qlookplot_all_frequencies_aia171_after.png",
+         destination / "qlookplot_all_frequencies_aia171_after.png"),
+        (imaging / "multiband_frequency_outlines_aia171_before.png",
+         destination / "multiband_frequency_outlines_aia171_before.png"),
+        (imaging / "multiband_frequency_outlines_aia171_after.png",
+         destination / "multiband_frequency_outlines_aia171_after.png"),
         (imaging / "tutorial_summary_before_10_to_12.png",
          destination / "tutorial_summary_before_10_to_12.png"),
         (imaging / "tutorial_summary_after_10_to_12.png",

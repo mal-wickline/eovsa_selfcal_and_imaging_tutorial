@@ -19,12 +19,17 @@ os.environ.setdefault("MPLCONFIGDIR", str(RUNTIME / "matplotlib"))
 Path(os.environ["SUNPY_CONFIGDIR"]).mkdir(parents=True, exist_ok=True)
 Path(os.environ["MPLCONFIGDIR"]).mkdir(parents=True, exist_ok=True)
 
+# CASA must be imported before Matplotlib/Astropy in the SunCASA conda
+# environment.  Importing the astronomy/plotting stack first can preload an
+# incompatible libssl, after which casatools' bundled libcurl fails with
+# ``Symbol not found: _SSL_get0_group_name`` on macOS.
+from casatasks import split
+from casatools import table
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.io import fits
 from astropy.time import Time
-from casatasks import split
-from casatools import table
+from astropy.wcs import WCS
 
 
 def antenna_for_spw(cfg: dict, spw: int) -> str:
@@ -176,6 +181,166 @@ def render_pair(before: Path, after: Path, output: Path, title: str) -> None:
     plt.close(fig)
 
 
+def render_frequency_outline_overlay(
+        cube_path: Path, aia_path: Path, output: Path, cfg: dict, label: str) -> None:
+    """Draw one compact, color-coded contour for each selected frequency.
+
+    This is the line-contour companion to SunCASA's filled multi-SPW summary.
+    It intentionally uses a small set of representative frequencies rather
+    than drawing all 47 planes: all-plane outlines become unreadable and can
+    make dirty-beam sidelobes look like solar structure.  Each contour level
+    is a fraction of that frequency plane's *flare-region* positive peak, not
+    its full-field peak.  That distinction is important for this limb event.
+    """
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    from matplotlib.colors import BoundaryNorm
+    from matplotlib.cm import ScalarMappable
+    from scipy.ndimage import binary_dilation, label as label_components
+    from skimage.measure import find_contours
+    import sunpy.map
+
+    with fits.open(cube_path) as hdus:
+        image_hdu = next(hdu for hdu in hdus if hdu.data is not None and hdu.data.ndim >= 3)
+        cube = np.asarray(image_hdu.data, dtype=float)
+        cube_header = image_hdu.header.copy()
+        table_hdu = next((hdu for hdu in hdus if hdu.data is not None and
+                          getattr(hdu.data, "names", None) and "cfreqs" in hdu.data.names), None)
+        if table_hdu is None:
+            raise RuntimeError(f"No cfreqs table found in {cube_path}")
+        frequencies = np.asarray(table_hdu.data["cfreqs"], dtype=float) / 1.0e9
+    cube = np.squeeze(cube)
+    if cube.ndim != 3 or cube.shape[0] != frequencies.size:
+        raise RuntimeError(
+            f"Unexpected multi-band cube shape {cube.shape} for {frequencies.size} frequencies")
+
+    aia_map = sunpy.map.Map(str(aia_path))
+    # A 1024x1024 AIA browse product has 2.4 arcsec pixels.  Enlarging its
+    # small limb-event crop produces the blocky background that can easily be
+    # mistaken for plotting blur.  Do not silently make that product.
+    aia_scale = max(abs(aia_map.scale.axis1.to_value(u.arcsec / u.pix)),
+                    abs(aia_map.scale.axis2.to_value(u.arcsec / u.pix)))
+    if aia_scale > 1.0:
+        raise RuntimeError(
+            f"AIA input is only {aia_map.data.shape} at {aia_scale:.2f} arcsec/pixel. "
+            "A publication-style flare crop requires a full-resolution AIA FITS "
+            "(approximately 4096x4096 at 0.6 arcsec/pixel). Supply it with "
+            "--aia-fits; the script will not enlarge this browse image.")
+    radio_wcs = WCS(cube_header).celestial
+    requested = cfg.get(
+        "qlookplot_outline_frequencies_ghz",
+        [2.9, 3.5, 4.5, 5.1, 6.8, 8.4, 9.7, 11.6])
+    indices = []
+    for value in requested:
+        index = int(np.nanargmin(np.abs(frequencies - float(value))))
+        if index not in indices:
+            indices.append(index)
+    selected = frequencies[indices]
+    contour_fraction = float(cfg.get("qlookplot_outline_peak_fraction", 0.70))
+
+    # Calculate thresholds only inside the requested flare-region field.  The
+    # full 512-pixel radio cube contains far-field sidelobes that can otherwise
+    # set the contour level and suppress the actual limb source.
+    cx, cy = map(float, cfg["xycen_arcsec"])
+    fx, fy = map(float, cfg.get("fov_arcsec", [256.0, 256.0]))
+    ny, nx = cube.shape[-2:]
+    yy, xx = np.mgrid[:ny, :nx]
+    wx, wy = radio_wcs.pixel_to_world_values(xx, yy)
+    # Astropy's WCS API returns celestial values in degrees even though the
+    # FITS header stores the EOVSA axes in arcsec.
+    wx, wy = np.asarray(wx) * 3600.0, np.asarray(wy) * 3600.0
+    roi = ((np.abs(wx - cx) <= fx / 2.0) & (np.abs(wy - cy) <= fy / 2.0))
+
+    fig = plt.figure(figsize=(8.4, 7.2), constrained_layout=True)
+    ax = fig.add_subplot(111, projection=aia_map)
+    finite_aia = aia_map.data[np.isfinite(aia_map.data)]
+    lo, hi = np.nanpercentile(finite_aia, [1.0, 99.7])
+    ax.imshow(aia_map.data, origin="lower", cmap="gray", vmin=lo, vmax=hi)
+
+    # Deliberately avoid a rainbow map.  These warm, ordered colors follow the
+    # visual language of the EOVSA flare-pipeline examples: low frequencies
+    # are red/orange and high frequencies approach pale yellow/white.
+    from matplotlib.colors import ListedColormap
+    colors = [
+        "#b32119", "#dc3b20", "#f05a28", "#f58b35",
+        "#f6b94a", "#f4d875", "#fff0ad", "#fff8dc",
+    ][:len(indices)]
+    cmap = ListedColormap(colors)
+    used_freqs = []
+    bottom_left = SkyCoord((cx - fx / 2) * u.arcsec, (cy - fy / 2) * u.arcsec,
+                           frame=aia_map.coordinate_frame)
+    top_right = SkyCoord((cx + fx / 2) * u.arcsec, (cy + fy / 2) * u.arcsec,
+                         frame=aia_map.coordinate_frame)
+    px0, py0 = aia_map.world_to_pixel(bottom_left)
+    px1, py1 = aia_map.world_to_pixel(top_right)
+    for color, index in zip(colors, indices):
+        plane = cube[index]
+        values = plane[roi & np.isfinite(plane) & (plane > 0)]
+        if not values.size:
+            print(f"Skipping {frequencies[index]:.3f} GHz: no positive flare-region pixels")
+            continue
+        level = contour_fraction * float(np.nanmax(values))
+        # Find the compact source island on the native EOVSA grid.  Reprojecting
+        # a full radio plane before contouring can turn a compact source into a
+        # narrow limb-aligned arc because the FITS stores HPC axes in arcsec
+        # while Astropy exposes celestial WCS values in degrees.  qlookplot's
+        # reliable pattern is the reverse: contour natively, transform only the
+        # resulting vertices, and leave the AIA pixels untouched.
+        components, count = label_components(
+            np.isfinite(plane) & roi & (plane >= level))
+        if not count:
+            print(f"Skipping {frequencies[index]:.3f} GHz: no source island")
+            continue
+        peak_image = np.where(roi & np.isfinite(plane), plane, -np.inf)
+        peak_y, peak_x = np.unravel_index(np.argmax(peak_image), plane.shape)
+        selected_component = int(components[peak_y, peak_x])
+        if selected_component == 0:
+            print(f"Skipping {frequencies[index]:.3f} GHz: peak island not found")
+            continue
+        source_island = components == selected_component
+        source_support = binary_dilation(source_island, iterations=2)
+        contour_image = np.where(source_support, plane, np.nan)
+        native_paths = find_contours(contour_image, level=level)
+        if not native_paths:
+            print(f"Skipping {frequencies[index]:.3f} GHz: contour not closed")
+            continue
+        for path in native_paths:
+            # skimage returns vertices as (row, column).  Convert native radio
+            # pixels to HPC, then HPC to the exact AIA detector-pixel grid.
+            radio_x_deg, radio_y_deg = radio_wcs.pixel_to_world_values(
+                path[:, 1], path[:, 0])
+            contour_world = SkyCoord(
+                np.asarray(radio_x_deg) * u.deg,
+                np.asarray(radio_y_deg) * u.deg,
+                frame=aia_map.coordinate_frame)
+            aia_x, aia_y = aia_map.world_to_pixel(contour_world)
+            ax.plot(aia_x.value, aia_y.value, color=color, linewidth=2.0)
+        used_freqs.append(float(frequencies[index]))
+
+    ax.set_xlim(sorted([px0.value, px1.value]))
+    ax.set_ylim(sorted([py0.value, py1.value]))
+    ax.coords[0].set_axislabel("Solar X [arcsec]")
+    ax.coords[1].set_axislabel("Solar Y [arcsec]")
+    ax.set_title(f"AIA 171 Å + EOVSA XX contours ({label})")
+
+    if used_freqs:
+        bounds = np.r_[selected[0] - 0.2, (selected[:-1] + selected[1:]) / 2,
+                       selected[-1] + 0.2]
+        norm = BoundaryNorm(bounds, cmap.N)
+        scalar = ScalarMappable(norm=norm, cmap=cmap)
+        scalar.set_array([])
+        cbar = fig.colorbar(scalar, ax=ax, ticks=selected, pad=0.025)
+        cbar.set_label("Representative frequency [GHz]")
+        cbar.ax.set_yticklabels([f"{value:.1f}" for value in selected])
+    # AIA is displayed with native detector pixels and no smoothing.  This
+    # avoids making a 1024-pixel cached AIA frame look artificially blurred.
+    for image_artist in ax.images:
+        image_artist.set_interpolation("none")
+    fig.savefig(output, dpi=160)
+    plt.close(fig)
+    print(f"Saved frequency-outline overlay: {output}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("config")
@@ -184,13 +349,19 @@ def main() -> None:
                         help="Comma-separated representative flare-region SPWs")
     parser.add_argument(
         "--frequency-ranges",
-        default="2~4GHz,5~6GHz,7~8GHz,9~10GHz,10~12GHz,12~14GHz,10~14GHz",
+        default="5~6GHz,7~8GHz,9~10GHz,10~12GHz,12~14GHz,10~14GHz",
         help="Comma-separated full-Sun/tutorial imaging frequency selections")
     parser.add_argument("--tutorial-summary", action="store_true",
                         help="Also download AIA 171 and save SunCASA summary figures")
     parser.add_argument(
+        "--aia-fits", default=None,
+        help="Optional local AIA 171 FITS; it is validated, cached in the run, and reused")
+    parser.add_argument(
         "--multiband", action="store_true",
         help="Make tutorial-style, color-coded individual-SPW overlays on AIA 171")
+    parser.add_argument(
+        "--contour-overlay-only", action="store_true",
+        help="Render frequency-outline PNGs from existing multi-band cubes; do no imaging")
     parser.add_argument("--reimage", action="store_true",
                         help="Regenerate FITS even when completed products already exist")
     args = parser.parse_args()
@@ -208,6 +379,42 @@ def main() -> None:
 
     out = run / "qa" / "tutorial_imaging"
     out.mkdir(parents=True, exist_ok=True)
+    if args.contour_overlay_only:
+        # Honour an explicit full-resolution file in the fast rendering path.
+        # Otherwise inspect every cached FITS and choose the finest AIA plate
+        # scale; filename sorting previously selected the 1024-pixel browse
+        # product even when a full-resolution Level-1 file was available.
+        if args.aia_fits:
+            aia_path = Path(args.aia_fits).expanduser().resolve()
+            if not aia_path.is_file():
+                raise SystemExit(f"AIA FITS not found: {aia_path}")
+        else:
+            import astropy.units as u
+            import sunpy.map
+            candidates = []
+            for candidate in sorted(out.glob("*.fits")):
+                try:
+                    candidate_map = sunpy.map.Map(str(candidate))
+                    if "AIA" not in str(candidate_map.meta.get("instrume", "")).upper():
+                        continue
+                    scale = max(abs(candidate_map.scale.axis1.to_value(u.arcsec / u.pix)),
+                                abs(candidate_map.scale.axis2.to_value(u.arcsec / u.pix)))
+                    candidates.append((scale, candidate))
+                except Exception:
+                    continue
+            if not candidates:
+                raise SystemExit(f"No cached AIA 171 FITS found in {out}")
+            aia_path = min(candidates)[1]
+        print(f"Using AIA for contour overlays: {aia_path}")
+        for label in ("before", "after"):
+            cube = out / f"multiband_{label}.image.fits"
+            if not cube.is_file():
+                raise SystemExit(f"Existing multi-band cube not found: {cube}")
+            render_frequency_outline_overlay(
+                cube, aia_path,
+                out / f"multiband_frequency_outlines_aia171_{label}.png",
+                cfg, label)
+        return
     before_ms, after_ms = out / "before_data.ms", out / "after_corrected.ms"
     if not before_ms.exists():
         split(vis=str(source), outputvis=str(before_ms), datacolumn="data")
@@ -302,10 +509,21 @@ def main() -> None:
             # JP2, which this x86 CASA/SunPy build downloads but cannot decode.
             from astropy import units as u
             from sunpy import map as sunmap
-            aia_downloads = ql.download_using_fido(
-                Time(aia_time.jd - 6 / 86400, format="jd"),
-                Time(aia_time.jd + 6 / 86400, format="jd"),
-                [171], 12 * u.second, scratch)
+            # Keep the AIA file in the run directory.  JSOC/SDO exports can
+            # time out even with a healthy local internet connection, and a
+            # file kept only in TemporaryDirectory is lost after every run.
+            aia_cache = out / "aia171_20240514T164721.fits"
+            aia_downloads = []
+            if args.aia_fits:
+                aia_downloads = [Path(args.aia_fits).expanduser().resolve()]
+            elif aia_cache.is_file():
+                aia_downloads = [aia_cache]
+                print(f"Reusing cached AIA 171 image: {aia_cache}")
+            else:
+                aia_downloads = ql.download_using_fido(
+                    Time(aia_time.jd - 6 / 86400, format="jd"),
+                    Time(aia_time.jd + 6 / 86400, format="jd"),
+                    [171], 12 * u.second, scratch)
             aia_files = []
             for item in aia_downloads:
                 candidate = Path(str(item))
@@ -322,6 +540,10 @@ def main() -> None:
                     "AIA 171 download failed. No tutorial summary was saved; "
                     "rerun with working network access and inspect the download error above.")
             aia_file = aia_files[0].resolve()
+            if aia_file != aia_cache.resolve():
+                shutil.copy2(aia_file, aia_cache)
+                aia_file = aia_cache.resolve()
+                print(f"Cached AIA 171 image for future runs: {aia_file}")
             print(f"Using validated AIA 171 image: {aia_file}")
             for label, vis in (("before", before_ms), ("after", after_ms)):
                 for frequency_range in frequency_ranges:
@@ -357,7 +579,8 @@ def main() -> None:
                 # explicitly approved after the updated-calibration survey.
                 multiband_spws = [
                     int(value) for value in cfg.get(
-                        "final_imaging_spws", cfg["selfcal_spws"])
+                        "qlookplot_multiband_spws",
+                        cfg.get("final_imaging_spws", cfg["selfcal_spws"]))
                 ]
                 if not multiband_spws:
                     raise RuntimeError("final_imaging_spws is empty")
@@ -368,6 +591,9 @@ def main() -> None:
                 if max(multiband_spws) >= 23:
                     multiband_antenna = cfg.get("antenna_by_spw", {}).get(
                         "23~49", multiband_antenna)
+                multiband_niter = int(cfg.get("qlookplot_multiband_niter", 100))
+                multiband_cell = float(cfg.get("qlookplot_multiband_cell_arcsec", 5.0))
+                multiband_imsize = int(cfg.get("qlookplot_multiband_imsize", 512))
                 for label, vis in (("before", before_ms), ("after", after_ms)):
                     cube = out / f"multiband_{label}.image.fits"
                     summary = out / f"multiband_aia171_{label}.png"
@@ -382,21 +608,49 @@ def main() -> None:
                             overwrite=True, quiet=False, plotaia=True,
                             aiawave=171, aiafits=str(aia_file),
                             xycen=cfg["xycen_arcsec"], fov=cfg["fov_arcsec"],
-                            imsize=[cfg["imsize"]],
-                            cell=[f'{cfg["cell_arcsec"]}arcsec'],
-                            usemsphacenter=False, restoringbeam=["6arcsec"],
-                            clevels=[0.5, 1.0], calpha=0.35,
+                            imsize=[multiband_imsize],
+                            cell=[f'{multiband_cell}arcsec'],
+                            niter=multiband_niter,
+                            # Leave restoringbeam at SunCASA's default.  This
+                            # release collapses explicit equal beam lists to a
+                            # single entry and then indexes that entry once per
+                            # SPW, causing an IndexError.  Its automatic EOVSA
+                            # beam calculation returns one appropriate beam per
+                            # frequency plane and follows qlookplot's documented
+                            # multi-SPW behavior.
+                            usemsphacenter=False,
+                            # Three positive fractional contours per band make
+                            # the source morphology visible without letting
+                            # negative dirty-beam sidelobes dominate the AIA.
+                            clevels=[0.50, 0.70, 0.90], calpha=0.55,
                         )
                         if not scratch_cube.is_file():
                             raise RuntimeError(
                                 f"SunCASA did not create multi-band cube: {scratch_cube}")
                         shutil.copy2(scratch_cube, cube)
                         plt.gcf().savefig(summary, dpi=180)
+                        # Descriptive aliases make the requested Meiqi-style
+                        # qlookplot products immediately recognizable in the
+                        # run directory and in a published GitHub gallery.
+                        shutil.copy2(
+                            summary,
+                            out / f"qlookplot_all_frequencies_aia171_{label}.png")
                         plt.close(plt.gcf())
+                        render_frequency_outline_overlay(
+                            cube, aia_file,
+                            out / f"multiband_frequency_outlines_aia171_{label}.png",
+                            cfg, label)
                     finally:
                         os.chdir(starting_directory)
                 (out / "multiband_spws.txt").write_text(
                     "Individual SPWs used: " + ",".join(spw_list) + "\n"
+                    f"Antenna selection: {multiband_antenna}\n"
+                    f"Timerange: {timerange}\n"
+                    f"Stokes/correlation: {stokes}\n"
+                    f"uvrange: {cfg['uvrange']}\n"
+                    f"imsize: {multiband_imsize}\n"
+                    f"cell: {multiband_cell}arcsec\n"
+                    f"niter: {multiband_niter}\n"
                     "Bands outside selfcal_spws are pipeline-calibrated context only.\n")
 
     for spw in representative_spws:
