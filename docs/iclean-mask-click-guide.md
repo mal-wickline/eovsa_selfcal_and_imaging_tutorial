@@ -1,5 +1,7 @@
 # `iclean` mask controls: exact click sequence
 
+See the [illustrated 2024-05-14 mask-making reference](../examples/2024-05-14-x8.8/mask-making-reference/README.md) for the pre-mask SPW survey and screenshots of accepted masks. The older screenshots labeled `mask_spw_5-6` illustrate the low-frequency mask shape; the production configuration uses the solve group `3~6` represented by SPW 5.
+
 The image toolbar is the vertical strip immediately to the right of the raster.
 From its top, the relevant icons are **Pan**, **Lasso Mask**, **Box Mask**,
 **Wheel Zoom**, **Poly Mask**, **Save**, and **Reset**. Below the horizontal

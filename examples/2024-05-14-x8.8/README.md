@@ -1,5 +1,11 @@
 # 2024-05-14 X8.8 calibration comparison gallery
 
+## Mask-making reference
+
+The [illustrated `iclean` mask-making reference](mask-making-reference/README.md) records the pre-mask SPW survey, why SPWs 1–2 were excluded from the self-calibration solve, the browser parameters, and the masks drawn for representative frequency groups.
+
+![Pre-mask survey showing the unreliable SPWs 1–2](mask-making-reference/pre_mask_spw_survey_spw01_31.png)
+
 The folders intentionally preserve two calibration generations:
 
 - [`previous-calibration/`](previous-calibration/) is the accepted baseline
@@ -29,11 +35,6 @@ IDB files, Measurement Set, CASA images, or gain tables.
 - `tutorial_summary_{before,after}_10_to_12.png`: tutorial-style AIA 171
   context with positive 60/75/90 percent radio contours. The similarity is
   expected for a phase-only solve that converged after its first round.
-- `qlookplot_all_frequencies_aia171_{before,after}.png`: one tutorial-style
-  multi-frequency quicklook figure for each calibration state.
-- `multiband_frequency_outlines_aia171_{before,after}.png`: one contour per
-  representative frequency (2.9, 3.5, 4.5, 5.1, 6.8, 8.4, 9.7, and 11.6
-  GHz) over the same sharp AIA 171 frame.
 
 The solve covered SPWs 3--31 (about 2.87--11.97 GHz). Thus 10--12 GHz is the
 highest-frequency in-solve comparison. Products above 12 GHz are context only.
@@ -76,20 +77,7 @@ highest-frequency in-solve comparison. Products above 12 GHz are context only.
 
 ![Tutorial summary after](previous-calibration/tutorial_summary_after_10_to_12.png)
 
-### Original-calibration all-frequency quicklook before and after
-
-![Original calibration quicklook before](previous-calibration/qlookplot_all_frequencies_aia171_before.png)
-
-![Original calibration quicklook after](previous-calibration/qlookplot_all_frequencies_aia171_after.png)
-
-### Original-calibration representative-frequency outlines
-
-![Original calibration outlines before](previous-calibration/multiband_frequency_outlines_aia171_before.png)
-
-![Original calibration outlines after](previous-calibration/multiband_frequency_outlines_aia171_after.png)
-
 ## Updated-calibration results
 
-The PI-updated calibration rerun passed preflight and two accepted phase-only
-self-cal rounds. Its separate gallery is documented in
-[`updated-calibration/README.md`](updated-calibration/README.md).
+This section is deliberately empty until the new MS has passed preflight,
+self-cal QA, and gallery review. See [`updated-calibration/README.md`](updated-calibration/README.md).
