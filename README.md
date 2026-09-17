@@ -19,6 +19,7 @@ Repository guides:
 
 - [Exact `iclean` clicks](docs/iclean-mask-click-guide.md)
 - [Worked-event decisions and limitations](docs/EVENT_2024-05-14.md)
+- [Experimental 2020-12-07 C7.4 case study](docs/EVENT_2020-12-07.md)
 - [Generated product tree](docs/PRODUCTS.md)
 - [CARTA and macOS figure viewing](docs/VIEWING.md)
 - [Selected example gallery](examples/2024-05-14-x8.8/README.md)
@@ -61,19 +62,107 @@ uname -m
 It must print `arm64` for the primary workflow. The older Rosetta environment
 is used only where SunCASA is required; it is not used to run `iclean`.
 
+### Modular CASA versus standalone CASA
+
+The primary workflow uses **Modular CASA**: the `casatasks`, `casatools`, and
+`casadata` Python packages installed into an ordinary Python environment. It
+does **not** use the standalone/monolithic CASA application or its `casa`
+executable. Both setup options below install the same Modular CASA packages
+and run the same repository scripts.
+
+A standalone CASA download bundles its own Python interpreter and application.
+Do not launch the primary workflow inside that application or mix its packages
+into the project environment. The optional legacy SunCASA imaging step is kept
+in a separate CASA 6.6.x environment because its dependencies differ from the
+native CASA 6.7 `iclean` environment.
+
 ## Create the environment
 
-From the repository root:
+These steps assume macOS. Open **Terminal** from
+**Finder → Applications → Utilities → Terminal**, or press Command-Space,
+type `Terminal`, and press Return. Enter commands after the `%` prompt; do not
+type the prompt itself.
+
+### Download the repository
+
+Choose one method:
+
+1. On GitHub, select **Code → Download ZIP**, double-click the downloaded ZIP,
+   and move the resulting folder somewhere permanent; or
+2. if Git is installed, clone it in Terminal:
+
+```bash
+cd ~/Downloads
+git clone https://github.com/mal-wickline/eovsa_selfcal_and_imaging_tutorial.git
+```
+
+Enter the repository directory. If its name differs, substitute its real path:
+
+```bash
+cd ~/Downloads/eovsa_selfcal_and_imaging_tutorial
+pwd
+ls
+```
+
+`pwd` should show the repository, and `ls` should include `README.md`,
+`setup_macos.sh`, `scripts`, and `config`. Keep this Terminal open while
+`iclean` is running; the browser window is only the graphical front end.
+
+### Option A: Python virtual environment (`.venv`, recommended)
+
+This is the setup used for the worked 2024 event. From the repository root:
 
 ```bash
 chmod +x setup_macos.sh
 ./setup_macos.sh
 source .venv/bin/activate
-python -c 'import platform,casatasks,cubevis; print(platform.machine()); print(casatasks.version()); print(cubevis.__version__)'
+python -c 'import platform, casatasks; from importlib.metadata import version; print("architecture:", platform.machine()); print("CASA:", casatasks.version()); print("CubeVis:", version("cubevis"))'
 ```
 
 Expected architecture: `arm64`. The setup is project-local and does not modify
-old CASA or SunCASA environments.
+old CASA or SunCASA environments. A successful activation normally adds
+`(.venv)` to the Terminal prompt. In each new Terminal, return to the
+repository and run `source .venv/bin/activate` again before using the scripts.
+
+### Option B: Conda environment
+
+Users who prefer Conda can create an isolated environment with the same
+Python version and Modular CASA packages. Install a native Apple-silicon
+Miniforge, Miniconda, or Anaconda distribution first, then open a new Terminal
+and run these commands from the repository root:
+
+```bash
+uname -m
+conda create --name eovsa-selfcal python=3.12 pip -y
+conda activate eovsa-selfcal
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install "casatasks>=6.7.2" "casatools>=6.7.2" \
+  "cubevis==1.0.14" "bokeh>=3.8" matplotlib astropy numpy
+python -c 'import platform, casatasks; from importlib.metadata import version; print("architecture:", platform.machine()); print("CASA:", casatasks.version()); print("CubeVis:", version("cubevis"))'
+```
+
+The first command must print `arm64`. A successful activation normally adds
+`(eovsa-selfcal)` to the prompt. In each new Terminal, run
+`conda activate eovsa-selfcal`; do not also activate `.venv`. All later
+commands are identical for both environment options.
+
+If `conda activate` says that the shell is not initialized, run
+`conda init zsh`, close Terminal, open it again, and retry. If `python` reports
+`x86_64`, stop and install/use a native Apple-silicon Conda distribution.
+
+### Confirm the scripts are ready
+
+From the repository root, with exactly one environment activated:
+
+```bash
+which python
+python -m py_compile scripts/preflight.py scripts/selfcal.py
+python scripts/selfcal.py
+```
+
+The last command prints usage information; that is expected. Repository
+scripts do not need to be double-clicked or copied into CASA. Run them from
+Terminal with `python scripts/<script-name>.py ...`, as shown below.
 
 ## Create an event configuration
 
@@ -168,8 +257,9 @@ open "$RUN_DIR/qa/round_00/images/all_spws.png"
 ```
 
 Use the montage to remove unusable SPWs and group adjacent SPWs with similar
-source morphology. Update `selfcal_spws`, `mask_spw_groups`, and
-`mask_browser_spw_by_group` in the configuration.
+source morphology. Update `selfcal_spws` and the event-dependent
+`mask_spw_groups` in the configuration. The browser displays the complete
+configured SPW range for each group, not a representative SPW.
 
 ### 4. Run visibility-domain diagnostics
 
@@ -342,6 +432,22 @@ The 2024-05-14 example used:
 These choices and their evidence are documented in
 [docs/EVENT_2024-05-14.md](docs/EVENT_2024-05-14.md). They are not universal
 defaults.
+
+## Experimental 2020-12-07 event workflow
+
+The repository also includes a separate C7.4 case study for testing the same
+scientific procedure on an older, 50-SPW observation. It is intentionally kept
+apart from the main worked example:
+
+- the **2024 configuration and `scripts/selfcal.py` remain the primary,
+  published workflow**;
+- `config/2020-12-07-c7.4.example.json` records the 2020 event decisions; and
+- `scripts/selfcal_2020_iclean.py` contains only the event-specific CASA 6.7
+  adjustments needed by that MS while retaining interactive `iclean`.
+
+See [docs/EVENT_2020-12-07.md](docs/EVENT_2020-12-07.md) for the decisions,
+commands, accepted procedure, and current limitations. Its AIA grayscale and
+multiband contour figures are preliminary and are not yet publication-ready.
 
 ## Known quirks and safeguards
 
