@@ -164,6 +164,12 @@ The last command prints usage information; that is expected. Repository
 scripts do not need to be double-clicked or copied into CASA. Run them from
 Terminal with `python scripts/<script-name>.py ...`, as shown below.
 
+## Find flare peak time and find flare location
+
+
+
+
+
 ## Create an event configuration
 
 ```bash
