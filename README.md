@@ -164,12 +164,110 @@ The last command prints usage information; that is expected. Repository
 scripts do not need to be double-clicked or copied into CASA. Run them from
 Terminal with `python scripts/<script-name>.py ...`, as shown below.
 
-## Find flare peak time and find flare location
+## Select the peak interval and confirm the flare location
 
+Do this **before** the preflight survey or any gain solve. It follows the EOVSA
+guide to [making quick-look flare spectrograms and images](https://ovsa.njit.edu/docs/pages/making-quick-look-flare-spectrograms-and-images/),
+using the calibrated Measurement Set named by the event configuration. The
+diagnostic is read-only with respect to the input MS.
 
+The reusable implementation is
+[`scripts/event_overview.py`](scripts/event_overview.py). Run it with the same
+CASA/SunCASA Python that imports `casatasks`, `sunpy`, and `suncasa`.
 
+### 1. Plot the spectrum and choose the peak interval
 
+Copy and edit the updated-calibration example first so that `input_ms` points
+to your local MS:
 
+```bash
+cp config/2024-05-14-x8.8-updated-cal.example.json \
+   config/2024-05-14-x8.8-updated-cal.json
+
+conda activate eovsa-selfcal       # or activate the working .venv
+python -c 'import casatasks, suncasa, sunpy; print("overview environment OK")'
+python scripts/event_overview.py \
+  config/2024-05-14-x8.8-updated-cal.json --spectrogram-only
+```
+
+The top panel is a dynamic spectrum from every SPW in calibrated `DATA`. The
+script rejects auto-correlations, CASA-flagged samples, and literal zero
+placeholders. The lower panel shows representative background-subtracted
+frequency light curves, similar to the official EOVSA example. The cyan band
+marks the proposed short self-calibration interval.
+
+Choose a bright, compact, structurally stable interval rather than blindly
+using the absolute maximum. It must provide enough signal-to-noise without
+covering substantial source evolution. Save it as `timerange` in the event
+JSON, rerun the plot, and verify that the cyan band covers the intended
+feature.
+
+The dashed horizontal box recommends a contiguous 4 GHz imaging band centered
+on the largest background-subtracted enhancement between 2 and 16 GHz. Always
+inspect the light curves before accepting it; RFI can require a manual
+override. For the worked 2024 interval (`16:47:12–16:47:20 UT`), the measured
+enhancement peaks near 8 GHz, giving a **6–10 GHz** localization band.
+
+![Updated-calibration MS spectrogram and selected solve interval](examples/2024-05-14-x8.8/event-selection/updated_calibrated_ms_spectrogram.png)
+
+### 2. Make a full-disk radio image and draw the solar limb
+
+After selecting the time and frequency range, run:
+
+```bash
+python scripts/event_overview.py \
+  config/2024-05-14-x8.8-updated-cal.json \
+  --full-disk-only --full-disk-frequency "6~10GHz"
+```
+
+The argument is a **frequency selection**, not an SPW range. The worked example
+does not use SPWs 19–26 simply because they are adjacent: the spectrum is the
+authority for the localization band. For another event, choose a contiguous
+4–6 GHz range around its observed spectral peak (for example, use
+`10~14GHz` when the flare peaks between 10 and 14 GHz).
+
+The diagnostic combines that band with MFS, images a 2560-arcsec field,
+registers the CASA image into helioprojective coordinates, and draws the solar
+limb with SunPy. Its internal non-interactive `tclean` is only a
+**pre-self-calibration location check** from the official recipe; it does not
+replace the interactive `iclean` masking used by this repository's science
+pipeline.
+
+![Full-disk EOVSA flare-location check with solar limb](examples/2024-05-14-x8.8/event-selection/full_disk_flare_location.png)
+
+Run both products together, allowing the spectrum to select the default 4 GHz
+band, by omitting the mode flags:
+
+```bash
+python scripts/event_overview.py \
+  config/2024-05-14-x8.8-updated-cal.json
+```
+
+The purpose is localization, not publication-quality deconvolution. Inspect
+the entire disk so a different active region is not mistaken for the target.
+In the worked image, the compact radio source is just inside the west limb near
+`(Solar X, Solar Y) ≈ (+902″, −293″)`.
+
+### 3. Confirm the location in JHelioviewer
+
+Open AIA 171 Å in JHelioviewer at the selected radio time, enable the grid, and
+move the cursor over the flaring structure identified by the full-disk radio
+map. Record the **helioprojective Cartesian** `(x, y)` readout in arcseconds
+from the lower-right status bar—not the heliographic longitude and latitude.
+
+The worked-event screenshot reads `(x, y) = (+902″, −293″)`, so the event JSON
+contains:
+
+```json
+"xycen_arcsec": [902.0, -293.0]
+```
+
+![JHelioviewer coordinate confirmation for the 2024-05-14 flare](examples/2024-05-14-x8.8/event-selection/jhelioviewer_2024-05-14_coordinates.png)
+
+Finally derive `phasecenter` from the confirmed coordinates with
+`scripts/derive_phasecenter.py`. Do not start self-calibration until the radio
+source, AIA flare, `xycen_arcsec`, and J2000 phase center all describe the same
+location.
 ## Create an event configuration
 
 ```bash
