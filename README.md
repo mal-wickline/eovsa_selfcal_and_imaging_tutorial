@@ -222,7 +222,7 @@ python scripts/event_overview.py \
 
 The argument is a **frequency selection**, not an SPW range. For another event, choose a contiguous
 four to six GHz range around its observed spectral peak (for example, use
-`4~8GHz` when the flare peaks between 4 and 8 GHz).
+`4~8GHz` when the flare peaks between 4 and 8 GHz). You can use your generated spectogram or check the EOVSA wiki / EOVSA data browser flare list to inform your selection --> https://ovsa.njit.edu/flarelist/
 
 The diagnostic combines that band with MFS, images a 2560-arcsec field,
 registers the CASA image into helioprojective coordinates, and draws the solar
