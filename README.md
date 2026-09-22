@@ -274,9 +274,11 @@ cp config/2024-05-14-x8.8.example.json config/my-event.json
 
 Edit `config/my-event.json`. At minimum, decide and document:
 
-The following is a **format example**, not a universal EOVSA selection. Determine
+The following is a **format example**, not a universal EOVSA selection. This is also not what was exactly selected for this event self-calibration; please check the 2024-05-14 event worked out example .md in this repository for the full input selection.  Determine
 the valid antennas, correlations, SPWs, coordinates, and time range from the
 particular MS, preflight report, event overview, and pre-mask survey. Check observer log and EOVSA Scientist on Duty daily log for help in antenna selection --> https://www.ovsa.njit.edu/wiki/index.php/Owens_Valley_Solar_Arrays#OVSA_Observing 
+
+**EXAMPLE ONLY**
 
 ```json
 {
