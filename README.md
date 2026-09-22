@@ -272,17 +272,22 @@ location.
 cp config/2024-05-14-x8.8.example.json config/my-event.json
 ```
 
-Edit `config/my-event.json`. At minimum, decide and document:
+Edit `config/my-event.json`. At minimum, decide and document the inputs shown
+below. Check the observer log and EOVSA Scientist on Duty daily log when
+choosing antennas: [OVSA Observing](https://www.ovsa.njit.edu/wiki/index.php/Owens_Valley_Solar_Arrays#OVSA_Observing).
 
-The following is a **format example**, not a universal EOVSA selection. This is also not what was exactly selected for this event self-calibration; please check the [2024-05-14 event worked out example](https://github.com/mal-wickline/eovsa_selfcal_and_imaging_tutorial/blob/main/docs/EVENT_2024-05-14.md) in this repository for the full input selection.  Determine
-the valid antennas, correlations, SPWs, coordinates, and time range from the
-particular MS, preflight report, event overview, and pre-mask survey. Check observer log and EOVSA Scientist on Duty daily log for help in antenna selection --> https://www.ovsa.njit.edu/wiki/index.php/Owens_Valley_Solar_Arrays#OVSA_Observing 
+**WORKED EXAMPLE ONLY — 2024-05-14 X8.8**
 
-**EXAMPLE ONLY**
+The values below are the actual science selections used for the worked 2024
+event. Replace the `input_ms` path with the location of that MS on your
+computer. Do not copy the time, position, antenna, or SPW decisions to another
+event without repeating the preflight, location, spectrogram, and survey
+checks.
 
 ```json
 {
-  "input_ms": "/absolute/path/to/IDBYYYYMMDD_HHMM-HHMMXXYY.cal.ms",
+  "event_id": "2024-05-14-x8.8",
+  "input_ms": "/absolute/path/to/IDB20240514_163948-165948.cal.ms",
   "timerange": "2024/05/14/16:47:12~2024/05/14/16:47:20",
   "correlation": "XX",
   "xycen_arcsec": [902.0, -293.0],
@@ -290,8 +295,10 @@ particular MS, preflight report, event overview, and pre-mask survey. Check obse
   "antenna": "0~6,8,10~12",
   "antenna_by_spw": {"23~49": "0~5,8,10~12"},
   "refant": "0",
-  "selfcal_spws": [3, 4, 5, 6, 7, 8, 9, 10],
-  "mask_spw_groups": ["3~6", "7~10"],
+  "minblperant": 3,
+  "minsnr": 0.0,
+  "selfcal_spws": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
+  "mask_spw_groups": ["3~6", "7~14", "15~22", "23~31"],
   "fov_arcsec": [256.0, 256.0],
   "cell_arcsec": 1.0,
   "imsize": 512,
@@ -319,6 +326,37 @@ particular MS, preflight report, event overview, and pre-mask survey. Check obse
 | `imsize` | Positive integer | Pixels per image axis, commonly `128`, `256`, `512`, or `1024`. Approximate image width is `imsize * cell_arcsec`; choose these together. |
 | `robust` | Number from `-2.0` through `+2.0` | CASA Briggs weighting. Values near `-2` favor resolution, values near `+2` favor sensitivity, and `0` is a compromise. Typical trials are `-0.5`, `0.0`, `0.5`, and `1.0`. |
 | `uvrange` | CASA UV-distance string | `""` uses all baselines. Examples: `">500lambda"`, `">1klambda"`, `"0~20klambda"`, or `"1~50klambda"`. A lower cutoff suppresses large-scale solar structure but discards data. `">500lambda"` is the typical input here.|
+
+### EOVSA antenna labels and CASA antenna IDs
+
+EOVSA hardware labels are one-based, while CASA antenna IDs are zero-based.
+The complete EOVSA mapping is therefore:
+
+| Physical EOVSA antenna | MS antenna name | CASA ID |
+|---:|---|---:|
+| 1 | `eo01` | 0 |
+| 2 | `eo02` | 1 |
+| 3 | `eo03` | 2 |
+| 4 | `eo04` | 3 |
+| 5 | `eo05` | 4 |
+| 6 | `eo06` | 5 |
+| 7 | `eo07` | 6 |
+| 8 | `eo08` | 7 |
+| 9 | `eo09` | 8 |
+| 10 | `eo10` | 9 |
+| 11 | `eo11` | 10 |
+| 12 | `eo12` | 11 |
+| 13 | `eo13` | 12 |
+| 14 | `eo14` | 13 |
+| 15 | `eo15` | 14 |
+
+For example, physical EOVSA antennas 1–3, 5, 7–9, and 11–13 become the CASA
+selection `"0~2,4,6~8,10~12"`. This table defines the numbering convention; it does
+not mean that all 15 antennas exist in every historical MS or are usable at
+every frequency. Confirm the actual `ID` and `NAME` columns in the preflight
+report, then remove unavailable, fully flagged, or known-problem antennas. Use
+`antenna_by_spw` when an otherwise useful antenna must be excluded only over a
+particular SPW range.
 
 JSON requires double quotes, allows no comments, and allows no trailing comma.
 Validate the edited file with:
