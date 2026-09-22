@@ -276,7 +276,7 @@ Edit `config/my-event.json`. At minimum, decide and document:
 
 The following is a **format example**, not a universal EOVSA selection. Determine
 the valid antennas, correlations, SPWs, coordinates, and time range from the
-particular MS, preflight report, event overview, and pre-mask survey.
+particular MS, preflight report, event overview, and pre-mask survey. Check observer log and EOVSA Scientist on Duty daily log for help in antenna selection --> https://www.ovsa.njit.edu/wiki/index.php/Owens_Valley_Solar_Arrays#OVSA_Observing 
 
 ```json
 {
