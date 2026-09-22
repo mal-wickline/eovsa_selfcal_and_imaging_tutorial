@@ -220,11 +220,9 @@ python scripts/event_overview.py \
   --full-disk-only --full-disk-frequency "6~10GHz"
 ```
 
-The argument is a **frequency selection**, not an SPW range. The worked example
-does not use SPWs 19–26 simply because they are adjacent: the spectrum is the
-authority for the localization band. For another event, choose a contiguous
-4–6 GHz range around its observed spectral peak (for example, use
-`10~14GHz` when the flare peaks between 10 and 14 GHz).
+The argument is a **frequency selection**, not an SPW range. For another event, choose a contiguous
+four to six GHz range around its observed spectral peak (for example, use
+`4~8GHz` when the flare peaks between 4 and 8 GHz).
 
 The diagnostic combines that band with MFS, images a 2560-arcsec field,
 registers the CASA image into helioprojective coordinates, and draws the solar
