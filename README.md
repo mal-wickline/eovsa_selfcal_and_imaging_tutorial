@@ -274,17 +274,56 @@ cp config/2024-05-14-x8.8.example.json config/my-event.json
 
 Edit `config/my-event.json`. At minimum, decide and document:
 
-- `input_ms`: absolute path to the calibrated MS;
-- `timerange`: short, bright, structurally stable solve interval;
-- `correlation`: normally `XX` for this example;
-- `xycen_arcsec`: helioprojective source center `(Solar X, Solar Y)` in arcsec;
-- `phasecenter`: CASA J2000 phase center derived from that location;
-- `antenna`: usable CASA antenna IDs—not 1-based EOVSA labels;
-- `antenna_by_spw`: frequency-dependent outages or restrictions;
-- `refant`: well-behaved reference antenna;
-- `selfcal_spws`: SPWs containing a recognizable source and usable data;
-- `mask_spw_groups`: adjacent SPWs with similar source morphology;
-- field of view, pixel size, robust weighting, and UV cutoff.
+The following is a **format example**, not a universal EOVSA selection. Determine
+the valid antennas, correlations, SPWs, coordinates, and time range from the
+particular MS, preflight report, event overview, and pre-mask survey.
+
+```json
+{
+  "input_ms": "/absolute/path/to/IDBYYYYMMDD_HHMM-HHMMXXYY.cal.ms",
+  "timerange": "2024/05/14/16:47:12~2024/05/14/16:47:20",
+  "correlation": "XX",
+  "xycen_arcsec": [902.0, -293.0],
+  "phasecenter": "J2000 0.8975568718764093rad 0.3247543505252678rad",
+  "antenna": "0~6,8,10~12",
+  "antenna_by_spw": {"23~49": "0~5,8,10~12"},
+  "refant": "0",
+  "selfcal_spws": [3, 4, 5, 6, 7, 8, 9, 10],
+  "mask_spw_groups": ["3~6", "7~10"],
+  "fov_arcsec": [256.0, 256.0],
+  "cell_arcsec": 1.0,
+  "imsize": 512,
+  "robust": 1.0,
+  "uvrange": ">500lambda"
+}
+```
+
+### Allowed forms and event-dependent choices
+
+| Variable | Accepted input form | EOVSA choices and examples |
+|---|---|---|
+| `input_ms` | Absolute path in a JSON string | Any calibrated EOVSA CASA Measurement Set readable by the installed CASA version, such as `"/Users/name/data/IDB20240514_163948-165948.cal.ms"`. Do not use a raw IDB file, relative path, or `~`. |
+| `timerange` | One CASA time-selection string | Full date/time, such as `"2024/05/14/16:47:12~2024/05/14/16:47:20"`, or same-day times such as `"16:47:12~16:47:20"` when CASA can infer the date. Fractional seconds are allowed. Choose a short, bright, structurally stable interval inside the MS. |
+| `correlation` | Correlation string present in the MS | Normally `"XX"` here. `"YY"` is possible when intended and present. CASA permits `"XX,YY"`, but this workflow and its QA are designed around one parallel-hand product. |
+| `xycen_arcsec` | Two numbers, `[x, y]` | Helioprojective Solar-X and Solar-Y in arcsec, such as `[902.0, -293.0]`, `[119.0, -422.0]`, or `[0.0, 0.0]` for disk center. Either value may be positive, negative, or zero. |
+| `phasecenter` | CASA direction string | Prefer J2000 radians, such as `"J2000 0.8975568718764093rad 0.3247543505252678rad"`, derived from `xycen_arcsec` and the observation time with `derive_phasecenter.py`. CASA can also parse valid J2000 sexagesimal directions. |
+| `antenna` | CASA antenna-selection string using zero-based IDs | One ID (`"0"`), a comma list (`"0,1,2,4"`), an inclusive range (`"0~6"`), or a mixture (`"0~2,4,6~8,10~12"`). `""` selects all antennas, but use it only after confirming all are valid. These are CASA IDs, not one-based EOVSA hardware labels. |
+| `antenna_by_spw` | Object mapping SPW selections to antenna selections | `{}` means no overrides. Examples: `{"23~49": "0~5,8,10~12"}` or `{"1~18": "0~8", "19~31": "0~7"}`. Entries should not overlap, and a mask group must not cross an antenna-selection boundary. |
+| `refant` | Selected CASA antenna ID as a string | `"0"`, `"1"`, or another stable antenna with broad SPW coverage. Choose it from flag and gain QA, not merely its number. |
+| `selfcal_spws` | JSON list of integer SPW IDs | Any existing SPWs with recognizable source emission and usable baselines, such as `[3, 4, 5, 6]` or `[1, 2, 3, 4, 7, 8]`. Do not use a quoted CASA range here. Dataset SPW counts vary, so every ID must be verified. |
+| `mask_spw_groups` | List of quoted CASA SPW selections | A single SPW (`"3"`) or adjacent inclusive range (`"3~6"`), such as `["1~2", "3~6", "7~11"]`. Group similar morphology and one antenna selection. The browser displays the combined range, not a representative SPW. |
+| `fov_arcsec` | Two positive numbers, `[width, height]` | Field of view in arcsec, such as `[256.0, 256.0]` or `[512.0, 384.0]`. Include the source and enough background to identify sidelobes. |
+| `cell_arcsec` | Positive number | Pixel scale in arcsec/pixel, commonly `0.5`, `1.0`, `2.0`, or `5.0`. It must adequately sample the synthesized beam. |
+| `imsize` | Positive integer | Pixels per image axis, commonly `128`, `256`, `512`, or `1024`. Approximate image width is `imsize * cell_arcsec`; choose these together. |
+| `robust` | Number from `-2.0` through `+2.0` | CASA Briggs weighting. Values near `-2` favor resolution, values near `+2` favor sensitivity, and `0` is a compromise. Typical trials are `-0.5`, `0.0`, `0.5`, and `1.0`. |
+| `uvrange` | CASA UV-distance string | `""` uses all baselines. Examples: `">500lambda"`, `">1klambda"`, `"0~20klambda"`, or `"1~50klambda"`. A lower cutoff suppresses large-scale solar structure but discards data. |
+
+JSON requires double quotes, allows no comments, and allows no trailing comma.
+Validate the edited file with:
+
+```bash
+python -m json.tool config/my-event.json >/dev/null
+```
 
 Never copy antenna or SPW selections blindly between events. The preflight
 report and survey images are the authority.
@@ -296,6 +335,45 @@ If `phasecenter` has not been derived, use a working SunCASA environment:
 ```
 
 Do not solve gains while `xycen_arcsec` or `phasecenter` is missing.
+
+### Choose the `iclean` controls deliberately
+
+The controls in each combined-group browser govern the exploratory CLEAN used
+to draw and assess the mask. They do not select the later gain-calibration mode.
+
+| Control | Accepted values | Meaning and practical choice |
+|---|---|---|
+| `niter` | Integer `0` or greater | Maximum minor-cycle component iterations. `0` makes only the initial dirty/residual image. Start with `100`; increase gradually only while real masked emission remains. Very large values can clean noise or sidelobes. |
+| `cycleniter` | Positive integer, or `-1` for no per-cycle limit | Minor-cycle iterations before returning to a major cycle. `25` gives cautious, frequent feedback. A larger value is faster but provides fewer inspection points. |
+| `nmajor` | Positive integer, `0`, or `-1` | Maximum major cycles. A major cycle predicts and subtracts the model using the full visibility calculation. `-1` lets another stopping condition or the user stop the run. |
+| `threshold` | Non-negative absolute flux-density threshold | Stops when the peak residual reaches this value. `0.0` disables this cutoff. Use a nonzero value only when the image units and noise are understood. |
+| `nsigma` | Non-negative number | Residual-RMS stopping multiplier. `0.0` disables it. `3.0`–`5.0` may help with a reliable noise estimate, but structured solar emission and sidelobes can make it misleading. |
+| `gain` | Number greater than `0`, normally at most `1` | CLEAN loop gain: the fraction of a component removed per minor iteration. `0.05` is conservative for these EOVSA masks. This is not an antenna gain solution. |
+| `cyclefactor` | Positive number | Multiplies CASA's minor-to-major-cycle threshold. `1.0` is the neutral starting choice. Change it only for a diagnosed cycle-control problem. |
+
+Recommended first pass:
+
+```text
+nmajor = -1
+niter = 100
+cycleniter = 25
+threshold = 0.0
+nsigma = 0.0
+gain = 0.05
+cyclefactor = 1.0
+```
+
+Run one cycle, inspect the image and residual, revise the mask if needed, and
+stop once it encloses the connected source without detached sidelobes. If the
+source is not distinguishable, do not compensate only by increasing `niter`;
+revisit the grouping, antennas, phase center, UV cutoff, field of view, or time.
+
+After all masks are saved, the Terminal asks for `Model-image iterations`.
+That separate value controls the non-interactive model supplied to `gaincal`.
+Begin with `100`, then inspect the model, residual, gain coverage, and all-SPW
+montage before accepting the table. Increase it only if genuine source flux is
+unmodeled; reduce it if sidelobes or noise enter the model. Phase is measured in
+degrees rather than “centering around 1”; phase-only gain amplitudes stay at 1.
 
 ## Run order
 

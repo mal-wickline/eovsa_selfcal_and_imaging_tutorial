@@ -1,6 +1,6 @@
 # `iclean` mask controls: exact click sequence
 
-See the [illustrated 2024-05-14 mask-making reference](../examples/2024-05-14-x8.8/mask-making-reference/README.md) for the pre-mask SPW survey and screenshots of accepted masks. The older screenshots labeled `mask_spw_5-6` illustrate the low-frequency mask shape; the production configuration uses the solve group `3~6` represented by SPW 5.
+See the [illustrated 2024-05-14 mask-making reference](../examples/2024-05-14-x8.8/mask-making-reference/README.md) for the pre-mask SPW survey and screenshots of accepted masks. Some archived screenshots have older labels, but the current browser displays the complete configured SPW range as one combined image.
 
 The image toolbar is the vertical strip immediately to the right of the raster.
 From its top, the relevant icons are **Pan**, **Lasso Mask**, **Box Mask**,
@@ -34,5 +34,5 @@ CARTA.
 
 For every event group, mask the connected yellow/orange central source and a
 small buffer. Do not include detached orange patches or the broad purple
-sidelobe pattern. The 2024-05-14 groups and representative browser images were
-SPWs `3~6` (display SPW 5), `7~14` (12), `15~22` (18), and `23~31` (24).
+sidelobe pattern. The 2024-05-14 groups were SPWs `3~6`, `7~14`, `15~22`, and
+`23~31`; each browser image combines all SPWs in its stated group.
