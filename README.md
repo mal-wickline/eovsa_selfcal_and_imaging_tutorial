@@ -509,7 +509,7 @@ assessment cycle. Draw only around connected source emission, not sidelobes.
 At each solve prompt:
 
 - enter `p` for a phase-only round;
-- enter the model iterations (the example used 100 for round 1 and 50 for
+- enter the model iterations (the example used 100 for round 1 and 100 for
   round 2);
 - wait for all configured SPWs to solve and for QA to finish;
 - inspect the checklist below before entering `a`, `c`, or `r`.
