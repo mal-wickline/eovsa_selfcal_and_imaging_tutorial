@@ -130,7 +130,7 @@ Model-image iterations (for example 100):
 enter:
 
 ```text
-1000
+100
 ```
 
 Wait until Terminal 1 prints the round-1 QA directory and pauses at the
@@ -178,7 +178,7 @@ p
 At the iteration prompt enter:
 
 ```text
-1000
+100
 ```
 
 When Terminal 1 reaches the round-2 accept/reject prompt, inspect the products
@@ -207,11 +207,11 @@ $RUN_DIR/final/short_peak.selfcal.ms
 
 ```text
 Round 1 solve:             ap
-Round 1 model iterations: 1000
+Round 1 model iterations: 100
 Round 1 decision:          c    # accept and continue
 Update masks:              n
 Round 2 solve:             p
-Round 2 model iterations: 1000
+Round 2 model iterations: 100
 Round 2 decision:          a    # accept and finish
 ```
 
