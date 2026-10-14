@@ -25,8 +25,8 @@ full-duration MS, and this demonstration does not run `apply-full`.
 | Reference antenna | original CASA ID `0` / EOVSA antenna 1 |
 | Minimum baselines per antenna | `3` |
 | Mask groups shown by `iclean` | `0~2`, `3~5`, `6~12`, `13~20`, `21~30`, `31~40` |
-| Round 1 | `ap`, 1000 model-image iterations |
-| Round 2 | `p`, 1000 model-image iterations |
+| Round 1 | `ap`, 100 model-image iterations |
+| Round 2 | `p`, 100 model-image iterations |
 | QA imaging after each round | 500 iterations, gain 0.1 |
 
 The last mask group includes SPWs 36–40 as adjacent imaging context, but only
@@ -63,8 +63,21 @@ Repeat this for all six browser sessions:
 2. Draw one closed region around the connected bright source, with a small
    buffer. Do not include detached bright patches or broad sidelobes.
 3. Click **Mask Add** or press `a`.
-4. Set `niter=100`, `cycleniter=25`, and `gain=0.05` for the mask-assessment
-   cycle. Leave `nmajor=-1`, `threshold=0`, `nsigma=0`, and `cyclefactor=1`.
+4. In the `iclean` parameter panel, use:
+
+   | Browser field | Value |
+   |---|---:|
+   | `nmajor` | `-1` |
+   | `niter` | `1000` |
+   | `threshold` | `0.0` |
+   | `nsigma` | `0.0` |
+   | `gain` | `0.05` |
+   | `cycleniter` | `-1` |
+   | `cyclefactor` | `1.0` |
+
+   These values control the interactive CLEAN preview used to assess and save
+   the mask. The browser's `niter=1000` is **not** the answer to the later
+   Terminal prompt for `p` or `ap` model-image iterations.
 5. Click the **single circular-arrow** button once and inspect the result.
 6. Revise with **Mask Add** or **Mask Sub** if needed.
 7. Click the **red stop** button and confirm exit. This saves the mask and
@@ -78,6 +91,11 @@ The groups appear in this order:
 
 After the sixth browser closes, the script makes the masked round-0 images and
 then asks for the first solve.
+
+At each Terminal solve prompt, enter **100** model-image iterations. Do not use
+1000 for either the `ap` round or the `p` round; that deconvolves the gain-solve
+model too deeply. In short: `iclean` browser `niter=1000`, but Terminal
+model-image iterations `=100`.
 
 ## Terminal 2 — prepare the QA viewer
 
