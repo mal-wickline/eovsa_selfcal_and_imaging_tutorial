@@ -32,6 +32,137 @@ full-duration MS, and this demonstration does not run `apply-full`.
 The last mask group includes SPWs 36–40 as adjacent imaging context, but only
 SPWs 0–35 receive gain solutions.
 
+## Build the JSON for a different event (no Codex required)
+
+Do not copy the scientific selections from this C6.7 event into another
+event. The JSON is a record of measurements and choices made from the new
+Measurement Set. Start from the supplied schema instead of writing it from
+scratch:
+
+```bash
+cd /path/to/eovsa_selfcal_and_imaging_tutorial
+source .venv/bin/activate
+
+cp config/2024-05-14-x8.8.example.json config/my-event.json
+CONFIG="$PWD/config/my-event.json"
+open -e "$CONFIG"
+```
+
+Replace at least these event-dependent values:
+
+| JSON field | How to determine it |
+|---|---|
+| `event_id` | Choose a short, unique event name. |
+| `input_ms` | Use the absolute path to the calibrated EOVSA Measurement Set. |
+| `timerange` | Choose a short, bright, structurally stable interval from the event spectrum. |
+| `xycen_arcsec` | Measure the flare center in helioprojective Solar-X/Y arcseconds from the full-disk radio image and AIA/JHelioviewer. |
+| `phasecenter` | Generate it from `xycen_arcsec` with `derive_phasecenter.py`; do not calculate it by hand. |
+| `antenna`, `refant`, `antenna_by_spw` | Use the MS antenna mapping, flag fractions, visibility QA, and EOVSA observing log. These are zero-based CASA IDs, not one-based physical EOVSA labels. |
+| `selfcal_spws` | Include only SPWs in which the source is identifiable and can be modeled reliably. |
+| `mask_spw_groups` | Group adjacent SPWs with similar morphology; never cross an `antenna_by_spw` boundary. |
+| `mask_browser_spw_by_group` | Choose one clean representative SPW on which to draw the spatial mask for each group. |
+| `qa_spws` | Choose the SPWs that should be imaged in the QA montage; these do not control which SPWs are solved. |
+
+### 1. Choose the flare interval
+
+Enter an approximate interval in `timerange`, then make the dynamic spectrum:
+
+```bash
+python scripts/event_overview.py "$CONFIG" --spectrogram-only
+```
+
+Update `timerange` so it covers a bright compact feature without substantial
+source evolution. A longer interval provides more data, but it is unsuitable
+if the source morphology changes during that interval.
+
+### 2. Locate the source and derive the phase center
+
+Image a contiguous frequency band near the spectral peak. Replace `4~8GHz`
+with the band appropriate for the event:
+
+```bash
+python scripts/event_overview.py "$CONFIG" \
+  --full-disk-only \
+  --full-disk-frequency "4~8GHz"
+```
+
+Compare the radio source with AIA/JHelioviewer and write its Solar-X/Y location
+to the JSON, for example:
+
+```json
+"xycen_arcsec": [-747.0, 123.0]
+```
+
+Then use the SunCASA environment to derive and write the corresponding CASA
+phase center:
+
+```bash
+python scripts/derive_phasecenter.py "$CONFIG"
+```
+
+### 3. Select antennas from the data
+
+Return to the primary project environment and inspect the MS:
+
+```bash
+source .venv/bin/activate
+python scripts/preflight.py "$CONFIG"
+```
+
+The preflight report gives the SPW frequencies, available correlations, CASA
+antenna ID-to-name mapping, and flag fraction for each antenna. After entering
+a candidate antenna selection, make the read-only visibility diagnostics:
+
+```bash
+python scripts/visibility_qa.py "$CONFIG" qa/visibility_input
+open qa/visibility_input
+```
+
+Retain antennas with usable coverage and plausible visibility behavior. Choose
+a reliable retained antenna as `refant`. Do not infer CASA IDs from the EOVSA
+hardware numbers.
+
+### 4. Select solve SPWs and mask groups
+
+For the first survey, let `qa_spws` cover all SPWs present in the MS, then run:
+
+```bash
+python scripts/selfcal.py survey "$CONFIG"
+
+RUN_DIR="$(ls -td "$PWD"/runs/* | head -1)"
+open "$RUN_DIR/qa/round_00/images/all_spws.png"
+```
+
+Use the montage to set:
+
+- `selfcal_spws` to SPWs with a recognizable, modelable source;
+- `mask_spw_groups` to adjacent bands with similar morphology;
+- `mask_browser_spw_by_group` to one clean representative SPW per group;
+- `qa_spws` to the bands that should appear in subsequent QA montages;
+- `spw_min` and `spw_max` to the solve-range limits.
+
+Use `neighbor_half_width=0` when every target SPW should use its own model.
+Keep the compact-source baseline selection identical for model imaging and
+gain solving; this workflow uses `uvrange=">500lambda"`.
+
+### 5. Validate before self-calibration
+
+```bash
+python -m json.tool "$CONFIG" >/dev/null
+python scripts/preflight.py "$CONFIG"
+python scripts/selfcal.py survey "$CONFIG"
+```
+
+Review the preflight report and survey again. Only then begin the guided run:
+
+```bash
+python scripts/selfcal.py run "$CONFIG"
+```
+
+The template supplies the schema and normal imaging defaults. The spectrum,
+full-disk localization, preflight report, visibility diagnostics, and SPW
+survey supply the event-specific values.
+
 ## Terminal 1 — launch the guided run and `iclean`
 
 Paste this entire block:
