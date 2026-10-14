@@ -32,7 +32,7 @@ full-duration MS, and this demonstration does not run `apply-full`.
 The last mask group includes SPWs 36–40 as adjacent imaging context, but only
 SPWs 0–35 receive gain solutions.
 
-## Build the JSON for a different event (no Codex required)
+## Build the JSON for a different event 
 
 Do not copy the scientific selections from this C6.7 event into another
 event. The JSON is a record of measurements and choices made from the new
