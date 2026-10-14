@@ -13,7 +13,7 @@ full-duration MS, and this demonstration does not run `apply-full`.
 
 | Setting | Value |
 |---|---|
-| Input MS | `/Users/mallorywickline/20260904_1915/IDB20260904_1904-1923XXYY.ms` |
+| Input MS | `/Users/your_path/IDB20260904_1904-1923XXYY.ms` |
 | Solution interval in the data | `2026/09/04/19:14:48~2026/09/04/19:15:12` (24 s) |
 | Gain solution interval | `solint='inf'` over that 24 s interval, independently for each SPW |
 | Correlation | `XX` |
