@@ -9,6 +9,23 @@ The command creates and modifies only a new, time-selected `short_peak.ms`
 inside a timestamped run directory. It does **not** modify the original
 full-duration MS, and this demonstration does not run `apply-full`.
 
+Self-calibration solves a complex gain coefficient for each antenna, rather
+than an independent correction for every baseline. For antennas `i` and `j`,
+the visibility relation is approximately
+
+```text
+Vobserved(i,j) = g(i) × conjugate(g(j)) × Vmodel(i,j)
+```
+
+where each antenna gain can be written as an amplitude and a phase. In the
+image plane, phase corrections primarily control source registration,
+coherence, and morphology, while amplitude corrections change the recovered
+source strength. Therefore this tutorial first performs a phase-only (`p`)
+round to stabilize the source location and structure. Only after that round
+passes QA does round 2 solve amplitude and phase together (`ap`). Because
+self-calibration anchors the data to the CLEAN model, check for an unintended
+centroid shift after every round.
+
 ## Parameters used
 
 | Setting | Value |
@@ -25,8 +42,8 @@ full-duration MS, and this demonstration does not run `apply-full`.
 | Reference antenna | original CASA ID `0` / EOVSA antenna 1 |
 | Minimum baselines per antenna | `3` |
 | Mask groups shown by `iclean` | `0~2`, `3~5`, `6~12`, `13~20`, `21~30`, `31~40` |
-| Round 1 | `ap`, 100 model-image iterations |
-| Round 2 | `p`, 100 model-image iterations |
+| Round 1 | `p` (phase only), 100 model-image iterations |
+| Round 2 | `ap` (amplitude and phase), 100 model-image iterations |
 | QA imaging after each round | 500 iterations, gain 0.1 |
 
 The last mask group includes SPWs 36–40 as adjacent imaging context, but only
@@ -267,7 +284,7 @@ Solve this round as phase (p), amplitude (a), or both (ap)?
 enter:
 
 ```text
-ap
+p
 ```
 
 At:
@@ -295,8 +312,8 @@ Check:
   stable without a centroid jump or new fragmentation.
 - `gains_phase.png`: solutions should be reasonably smooth across neighboring
   SPWs, allowing normal phase wrapping.
-- `gains_amplitude.png`: because this is an `ap` round, amplitudes must be
-  finite and physically plausible rather than extreme.
+- `gains_amplitude.png`: because this is a phase-only round, amplitudes should
+  remain at 1.0.
 - `gain_coverage.json`: `solved_spws` should contain 0–35 and `missing_spws`
   should be empty.
 - `gain_summary.csv`: investigate missing antennas, flagged solutions, or
@@ -321,7 +338,7 @@ This reuses the same masks for round 2.
 At the next solve prompt enter:
 
 ```text
-p
+ap
 ```
 
 At the iteration prompt enter:
@@ -337,8 +354,11 @@ from Terminal 2:
 qa_round 2
 ```
 
-For this phase-only round, `gains_amplitude.png` should remain at amplitude
-1.0. Recheck morphology, phase behavior, gain coverage, and the summary CSV.
+For this amplitude-plus-phase round, recheck the phase solutions and require
+the amplitude gains to be finite, reasonably close to unity, and free of
+extreme antenna/SPW outliers. Confirm that the source brightness changes
+plausibly and that its centroid and morphology do not jump. Recheck gain
+coverage and the summary CSV before accepting.
 
 If round 2 is good, return to Terminal 1 and enter:
 
@@ -355,11 +375,11 @@ $RUN_DIR/final/short_peak.selfcal.ms
 ## Prompt cheat sheet
 
 ```text
-Round 1 solve:             ap
+Round 1 solve:             p
 Round 1 model iterations: 100
 Round 1 decision:          c    # accept and continue
 Update masks:              n
-Round 2 solve:             p
+Round 2 solve:             ap
 Round 2 model iterations: 100
 Round 2 decision:          a    # accept and finish
 ```
@@ -372,9 +392,12 @@ previously accepted tables on the run-owned short MS.
 
 The mask tells CLEAN where real compact solar emission is allowed. CLEAN builds
 a per-SPW source model using only baselines longer than 500 wavelengths.
-`gaincal` then solves antenna gains against that same compact-source baseline
-selection for the full 24-second flare interval. Round 1 corrects both
-amplitude and phase; round 2 refines phase while preserving the round-1
-amplitude scale. Every candidate is applied only to the short copied MS before
-its QA products are generated.
+`gaincal` then solves one complex gain coefficient per antenna against that
+same compact-source baseline selection for the full 24-second flare interval.
+Round 1 changes only the phase term, which improves source registration,
+coherence, and morphology without changing the gain amplitudes. Round 2 solves
+amplitude and phase together, allowing the visibility scale—and therefore the
+recovered source strength—to be corrected after the phase solution is stable.
+Every candidate is applied only to the short copied MS before its QA products
+are generated.
 
