@@ -80,15 +80,57 @@ The installed task does not accept `msoutdir`; the absolute `concatvis` path
 is authoritative. Record the eovsapy/SunCASA git revision or package path and
 the calibration-processing date in your lab notes and config.
 
-Verify `CORRECTED_DATA` before transfer:
+With `doconcat=True`, SunCASA selects each calibrated intermediate
+`CORRECTED_DATA` column and writes those values into the final concatenated MS
+`DATA` column. It may then print:
+
+```text
+Column MODEL_DATA removed
+Column CORRECTED_DATA removed
+```
+
+These are expected cleanup messages. They do not mean that calibration was
+discarded, and the final concatenated MS does not need to retain a separate
+`CORRECTED_DATA` column. Verify the final calibrated `DATA` before transfer:
 
 ```python
+import numpy as np
 from casatools import table
-tb = table(); tb.open(final_ms)
-print("Rows:", tb.nrows())
-print("CORRECTED_DATA present:", "CORRECTED_DATA" in tb.colnames())
-tb.close()
+
+tb = table()
+tb.open(final_ms)
+try:
+    columns = tb.colnames()
+    nrows = tb.nrows()
+    if "DATA" not in columns:
+        raise RuntimeError("DATA is absent from the final concatenated MS")
+    ncheck = min(nrows, 1000)
+    if ncheck == 0:
+        raise RuntimeError("Final concatenated MS contains no rows")
+    nonzero_usable = 0
+    for row in range(ncheck):
+        data = np.asarray(tb.getcell("DATA", row))
+        flags = np.asarray(tb.getcell("FLAG", row), dtype=bool)
+        usable = np.isfinite(data) & ~flags
+        nonzero_usable += int(np.count_nonzero(usable & (np.abs(data) > 0)))
+finally:
+    tb.close()
+
+print("Rows:", nrows)
+print("Columns:", columns)
+print("CORRECTED_DATA present (not required):", "CORRECTED_DATA" in columns)
+print("Nonzero, finite, unflagged samples in first", ncheck, "rows:",
+      nonzero_usable)
+
+if nonzero_usable == 0:
+    raise RuntimeError("No usable visibility samples found in final DATA")
 ```
+
+Also inspect the preceding `calibeovsa` log. It must identify the reference
+and daily phase-calibration records that were selected or interpolated.
+Investigate any message saying that no phase calibration was found or that a
+calibration step was skipped or aborted. Column layout alone cannot prove
+that every requested calibration product was available.
 
 ## 2. Download without touching the old MS
 

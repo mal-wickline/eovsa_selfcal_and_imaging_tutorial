@@ -42,6 +42,15 @@ IDB import requires EOVSAPY/SunCASA and calibration-database access; perform
 that upstream on the EOVSA pipeline or obtain the calibrated MS from the group.
 Do not put the MS inside this Git repository.
 
+The `.cal.ms` suffix is descriptive, not a distinct CASA file type. When
+`calibeovsa(..., doconcat=True)` constructs the final concatenated MS,
+SunCASA selects the calibrated intermediate `CORRECTED_DATA` values and writes
+them into the final MS `DATA` column. It may then remove the redundant
+`MODEL_DATA` and `CORRECTED_DATA` columns. Messages reporting those removals
+are expected finalization messages, not evidence that calibration was lost.
+This repository intentionally reads the upstream calibrated visibilities from
+`DATA`, then creates its own working `CORRECTED_DATA` column for self-calibration.
+
 ## Supported software
 
 The primary solver is designed for an Apple-silicon Mac running native
